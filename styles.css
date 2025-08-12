@@ -670,6 +670,28 @@ main {
     min-width: 160px;
 }
 
+/* Search input matches select appearance */
+.filter-input {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border: 2px solid var(--color-gray);
+    border-radius: var(--border-radius-md);
+    background: var(--color-white);
+    color: var(--color-text);
+    font-size: 1rem;
+    min-width: 260px;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.filter-input::placeholder {
+    color: var(--color-text-light);
+}
+
+.filter-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59, 76, 184, 0.12);
+}
+
 .filter-select:focus {
     outline: none;
     border-color: var(--color-primary);
@@ -680,6 +702,16 @@ main {
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: var(--spacing-xl);
     animation: fadeInUp 0.8s ease-out 0.4s both;
+}
+
+.no-results {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--color-text-light);
+    background: var(--color-white);
+    padding: var(--spacing-xxl);
+    border: 2px dashed var(--color-gray);
+    border-radius: var(--border-radius-md);
 }
 
 .store-card {

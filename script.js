@@ -178,20 +178,80 @@ function createStoreCard(store) {
     `;
 }
 
-// ======= Pagination Variables =======
+// ======= Pagination & Search Variables =======
 let currentPage = 1;
 let itemsPerPage = 6;
 let currentStores = [...storesData];
+let searchQuery = '';
+
+function normalizeText(value) {
+    return (value || '').toString().toLowerCase();
+}
+
+function computeRelevanceScore(store, query) {
+    const q = normalizeText(query).trim();
+    if (!q) return 0;
+    const terms = q.split(/\s+/).filter(Boolean);
+
+    const name = normalizeText(store.name);
+    const description = normalizeText(store.description);
+
+    let score = 0;
+    for (const term of terms) {
+        if (!term) continue;
+        if (name.startsWith(term)) score += 6; // strong signal
+        else if (name.includes(term)) score += 4; // medium signal
+        if (description.includes(term)) score += 2; // weak signal
+    }
+    return score;
+}
+
+function applyAllFilters() {
+    const floorFilter = document.getElementById('floor-filter');
+    const categoryFilter = document.getElementById('category-filter');
+    const floorValue = floorFilter ? floorFilter.value : 'all';
+    const categoryValue = categoryFilter ? categoryFilter.value : 'all';
+
+    // base filtering
+    let filtered = storesData.filter(store => {
+        const floorMatch = floorValue === 'all' || store.floor === floorValue;
+        const categoryMatch = categoryValue === 'all' || store.category === categoryValue;
+        return floorMatch && categoryMatch;
+    });
+
+    // relevance sorting only when searching
+    if (searchQuery && searchQuery.trim() !== '') {
+        filtered = filtered
+            .map(store => ({ store, score: computeRelevanceScore(store, searchQuery) }))
+            .filter(item => item.score > 0)
+            .sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                // tie-breaker alphabetical by name
+                return a.store.name.localeCompare(b.store.name);
+            })
+            .map(item => item.store);
+    }
+
+    currentStores = filtered;
+    currentPage = 1; // reset to first page on any filter/search change
+    renderStores(currentStores, currentPage);
+}
 
 function renderStores(stores = currentStores, page = currentPage) {
     const storesGrid = document.getElementById('storesGrid');
     if (storesGrid) {
+        if (!stores || stores.length === 0) {
+            storesGrid.innerHTML = '<div class="no-results">No stores found. Try adjusting filters or search.</div>';
+            updatePagination(0, 1);
+            return;
+        }
+
         const startIndex = (page - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
         const storesToShow = stores.slice(startIndex, endIndex);
-        
+
         storesGrid.innerHTML = storesToShow.map(store => createStoreCard(store)).join('');
-        
+
         // Update pagination
         updatePagination(stores.length, page);
     }
@@ -206,7 +266,14 @@ function updatePagination(totalItems, currentPage) {
     
     if (!paginationInfo || !paginationNumbers || !prevBtn || !nextBtn) return;
     
-    // Update info text
+    // Update info text and navigation buttons (handle zero state)
+    if (totalItems === 0) {
+        paginationInfo.textContent = 'Showing 0 of 0 stores';
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        paginationNumbers.innerHTML = '';
+        return;
+    }
     const startItem = (currentPage - 1) * itemsPerPage + 1;
     const endItem = Math.min(currentPage * itemsPerPage, totalItems);
     paginationInfo.textContent = `Showing ${startItem}-${endItem} of ${totalItems} stores`;
@@ -284,23 +351,21 @@ function goToPage(page) {
 }
 
 function filterStores() {
-    const floorFilter = document.getElementById('floor-filter');
-    const categoryFilter = document.getElementById('category-filter');
-    
-    if (!floorFilter || !categoryFilter) return;
-    
-    const floorValue = floorFilter.value;
-    const categoryValue = categoryFilter.value;
-    
-    currentStores = storesData.filter(store => {
-        const floorMatch = floorValue === 'all' || store.floor === floorValue;
-        const categoryMatch = categoryValue === 'all' || store.category === categoryValue;
-        return floorMatch && categoryMatch;
-    });
-    
-    // Reset to first page when filtering
-    currentPage = 1;
-    renderStores(currentStores, currentPage);
+    // Maintain backward compatibility: now delegates to unified filtering
+    applyAllFilters();
+}
+
+function setSearchQuery(value) {
+    searchQuery = value || '';
+    applyAllFilters();
+}
+
+function debounce(fn, delay) {
+    let timerId;
+    return (...args) => {
+        clearTimeout(timerId);
+        timerId = setTimeout(() => fn.apply(null, args), delay);
+    };
 }
 
 // ======= Initialize Stores =======
@@ -311,6 +376,7 @@ function initStores() {
         
         const floorFilter = document.getElementById('floor-filter');
         const categoryFilter = document.getElementById('category-filter');
+        const storeSearch = document.getElementById('store-search');
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
         
@@ -320,6 +386,13 @@ function initStores() {
         
         if (categoryFilter) {
             categoryFilter.addEventListener('change', filterStores);
+        }
+
+        if (storeSearch) {
+            const onSearch = debounce((e) => {
+                setSearchQuery(e.target.value);
+            }, 200);
+            storeSearch.addEventListener('input', onSearch);
         }
         
         // Add pagination button event listeners
